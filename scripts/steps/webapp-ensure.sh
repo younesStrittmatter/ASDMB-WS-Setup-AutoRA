@@ -5,19 +5,28 @@ source "$SCRIPT_DIR/config.env"
 source "$SCRIPT_DIR/lib/common.sh"
 
 echo "🔍 Looking for existing Firebase Web App..."
-APP_ID="$(fb apps:list --project "$PROJECT_ID" --json | jq -r '.result // [] | .[] | select(.platform=="WEB") | .appId' | head -n1)"
+APP_ID="$(fb apps:list --project "$PROJECT_ID" --json \
+  | jq -r '.result // [] | .[] | select(.platform=="WEB") | .appId' | head -n1)"
 
-if [ -z "$APP_ID" ]; then
+if [ -z "$APP_ID" ] || [ "$APP_ID" = "null" ]; then
   echo "🌐 No Web App found, creating one..."
-  if ! CREATE_OUTPUT="$(fb apps:create web "$WEBAPP_NAME" --project "$PROJECT_ID" --json 2>firebase_error.log)"; then
-    echo "❌ firebase apps:create failed:"; cat firebase_error.log; exit 1
+  CREATE_OUTPUT="$(fb apps:create web "$WEBAPP_NAME" --project "$PROJECT_ID" --json 2>firebase_error.log || true)"
+  # persist raw output for debugging
+  printf '%s\n' "$CREATE_OUTPUT" > .firebase_app_create_output.json
+
+  # robustly extract appId whether it's top-level or nested under result
+  APP_ID="$(printf '%s' "$CREATE_OUTPUT" | jq -r '(.appId // .result.appId // empty)')"
+
+  if [ -z "$APP_ID" ] || [ "$APP_ID" = "null" ]; then
+    echo "❌ Failed to extract Web App ID from create output:"
+    cat .firebase_app_create_output.json
+    echo "ℹ️ Check firebase_error.log for CLI stderr."
+    exit 1
   fi
-  echo "$CREATE_OUTPUT" > .firebase_app_create_output.json
-  APP_ID="$(echo "$CREATE_OUTPUT" | jq -r '.appId')"
-  [[ -z "$APP_ID" || "$APP_ID" = "null" ]] && { echo "❌ Failed to create Web App."; cat .firebase_app_create_output.json; exit 1; }
+  echo "✅ Created Web App: $APP_ID"
 else
   echo "✅ Found existing Web App: $APP_ID"
 fi
 
-# persist APP_ID for next steps
+# persist APP_ID for later steps
 echo "$APP_ID" > .firebase_app_id
