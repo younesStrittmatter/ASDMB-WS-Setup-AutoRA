@@ -20,7 +20,9 @@ export PROJECT_ID DISPLAY_NAME WEBAPP_NAME REGION BUILD_DIR SERVICE_ACCOUNT_KEY_
 # Execute steps in order
 
 bash "$SCRIPT_DIR/steps/bootstrap-tools.sh"
-bash "$SCRIPT_DIR/steps/auth-login.sh"
+bash "$SCRIPT_DIR/steps/auth-login-firebase.sh"
+bash "$SCRIPT_DIR/steps/project-ensure.sh"
+bash "$SCRIPT_DIR/steps/auth-login-gcloud.sh"
 #bash "$SCRIPT_DIR/steps/02-project-ensure.sh"
 #bash "$SCRIPT_DIR/steps/03-write-firebaserc.sh"
 #bash "$SCRIPT_DIR/steps/04-webapp-ensure.sh"
