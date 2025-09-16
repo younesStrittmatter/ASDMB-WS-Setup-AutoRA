@@ -1,4 +1,7 @@
-
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")/.." &>/dev/null && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
 
 ensure_firebase_account() {
   local active; active="$(get_firebase_active)"
