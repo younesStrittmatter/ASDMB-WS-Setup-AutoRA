@@ -159,17 +159,41 @@ fb() {
 get_gcloud_active() { gcloud config get-value account --quiet 2>/dev/null || true; }
 _first_email() { grep -Eo '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' | head -n1; }
 
+# returns the active firebase email or empty; never hard-fails
 get_firebase_active() {
-  local json email txt
-  json="$(fb login:list --json 2>/dev/null || true)"
-  if [ -n "$json" ]; then
-    email="$(printf '%s' "$json" | jq -r '.result[]? | select((.active==true) or (.default==true) or (.isDefault==true)) | (.email // .user // empty)')" || true
-    [[ -n "$email" && "$email" != "null" ]] && { printf '%s\n' "$email"; return 0; }
+  # bail fast if firebase missing, but don't error
+  command -v firebase >/dev/null 2>&1 || { echo ""; return 0; }
+
+  # get json (some versions print nothing or non-json when logged out)
+  local json
+  json="$(firebase login:list --json 2>/dev/null || true)"
+
+  # if no json, return empty safely (works under set -u)
+  [[ -n "${json:-}" ]] || { echo ""; return 0; }
+
+  # jq may be missing or filter could fail; protect it
+  if command -v jq >/dev/null 2>&1; then
+    # try several shapes: current_user or result[] entries marked active/default
+    local email
+    email="$(
+      printf '%s' "$json" | jq -r '
+        .current_user.email? //                      # newish shape
+        (.result[]? | select(.active==true or .default==true or .isDefault==true)
+          | (.email // .user // empty)) //          # older shapes
+        empty
+      ' 2>/dev/null || true
+    )"
+    [[ -n "${email:-}" && "$email" != "null" ]] && { printf '%s\n' "$email"; return 0; }
+    echo ""; return 0
+  else
+    # crude fallback: pull first email-looking token
+    if [[ "$json" =~ ([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}) ]]; then
+      printf '%s\n' "${BASH_REMATCH[1]}"; return 0
+    fi
+    echo ""; return 0
   fi
-  txt="$(fb login:list 2>/dev/null || true)"
-  email="$(printf '%s\n' "$txt" | _first_email)"
-  [[ -n "$email" ]] && printf '%s\n' "$email"
 }
+
 
 
 
